@@ -66,6 +66,11 @@ code {
   background: #28a745;
 }
 
+.btn-warning {
+  background: #ffc107;
+  color: #212529;
+}
+
 .btn-danger {
   background: #dc3545;
 }

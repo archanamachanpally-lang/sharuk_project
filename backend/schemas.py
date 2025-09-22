@@ -64,4 +64,66 @@ class GrokSummarizeResponse(BaseModel):
     summary: str
     recommendations: List[str]
     estimated_duration: str
-    priority_items: List[str] 
+    priority_items: List[str]
+
+# Risk Assessment schemas
+class RiskAssessmentStartRequest(BaseModel):
+    session_id: str
+    user_id: Optional[int] = None
+
+class RiskAssessmentStartResponse(BaseModel):
+    success: bool
+    risk_session_id: str
+    message: str
+
+class RiskAssessmentChatRequest(BaseModel):
+    risk_session_id: str
+    message: str
+    session_id: str
+
+class RiskAssessmentChatResponse(BaseModel):
+    success: bool
+    response: str
+    is_complete: bool
+    next_question: Optional[str] = None
+
+class RiskAssessmentFinishRequest(BaseModel):
+    risk_session_id: str
+    session_id: str
+
+class RiskAssessmentFinishResponse(BaseModel):
+    success: bool
+    summary: str
+    responses: List[Dict[str, Any]]
+
+# Risk Assessment Plan Generation schemas
+class GenerateRiskAssessmentRequest(BaseModel):
+    project_overview: dict
+    risk_categories: dict
+    stakeholders: dict
+    risk_matrix: dict
+    risk_register: dict
+    additional_comments: dict
+    all_risks_data: List[dict] = []  # Add the all_risks_data field
+    user_email: str
+
+# Feedback schemas
+class FeedbackRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    clarity_of_sprint_goals: Optional[str] = None
+    workload_distribution: Optional[str] = None
+    plan_alignment_sow: Optional[str] = None
+    suggestions_sprint_planning: Optional[str] = None
+    risks_clear: Optional[str] = None
+    mitigation_practical: Optional[str] = None
+    suggestions_risk_assessment: Optional[str] = None
+    overall_sprint_planning_rating: Optional[str] = None
+    overall_risk_assessment_rating: Optional[str] = None
+    additional_comments: Optional[str] = None
+    user_email: Optional[str] = None
+
+class FeedbackResponse(BaseModel):
+    success: bool
+    message: str
+    feedback_id: Optional[int] = None 

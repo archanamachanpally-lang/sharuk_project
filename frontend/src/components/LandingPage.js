@@ -13,52 +13,47 @@ const LandingPage = () => {
 
     try {
       const result = await loginWithGoogle();
-      
       if (result && result.success === false) {
         setError(result.message || 'Google OAuth failed. Please try again.');
+        setLoading(false);
       }
-      // If successful, the user will be redirected to Google OAuth
+      // If successful, loginWithGoogle will redirect to Google OAuth
+      // Don't set loading to false here as we're redirecting
     } catch (error) {
       setError('An unexpected error occurred. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="landing-page">
-      <div className="container">
-        <div className="card landing-card">
-          <div className="text-center">
-            <h1 className="landing-title">PM Portal</h1>
-            
-            <div className="login-section">
-              <button
-                className="btn google-login-btn"
-                onClick={handleGoogleLogin}
-                disabled={loading}
-              >
-                {loading ? (
-                  <span>Logging in...</span>
-                ) : (
-                  <>
-                    <span className="google-icon">🔐</span>
-                    Login with Google (Demo)
-                  </>
-                )}
-              </button>
-              
-              {error && (
-                <div className="error-message">
-                  {error}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      <header className="top-bar">
+        <img src="/forsys-logo.png" alt="Forsys Logo" className="forsys-logo" />
+      </header>
+
+      <div className="main-content">
+        <h1 className="main-heading">Welcome to PM Portal</h1>
+        <p className="sub-text">
+          Engage, plan, and collaborate effectively with your team using the PM portal built for Forsys employees.
+        </p>
+
+        <button
+          className="google-login-btn"
+          onClick={handleGoogleLogin}
+          disabled={loading}
+        >
+          <img
+            src="https://developers.google.com/identity/images/g-logo.png"
+            alt="Google"
+            className="google-icon-img"
+          />
+          {loading ? 'Logging in...' : 'Login with Google'}
+        </button>
+
+        {error && <div className="error-message">{error}</div>}
       </div>
     </div>
   );
 };
 
-export default LandingPage; 
+export default LandingPage;

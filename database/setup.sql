@@ -41,6 +41,14 @@ CREATE TABLE IF NOT EXISTS sprint_sessions (
     completed_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Documents table for storing generated summaries
+CREATE TABLE IF NOT EXISTS documents (
+    id SERIAL PRIMARY KEY,
+    feature VARCHAR(255) NOT NULL,
+    prompt TEXT NOT NULL,
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
@@ -49,6 +57,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_is_active ON sessions(is_active);
 CREATE INDEX IF NOT EXISTS idx_sprint_sessions_user_id ON sprint_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sprint_sessions_session_id ON sprint_sessions(session_id);
 CREATE INDEX IF NOT EXISTS idx_sprint_sessions_status ON sprint_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_documents_feature ON documents(feature);
+CREATE INDEX IF NOT EXISTS idx_documents_uploaded_at ON documents(uploaded_at);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -65,6 +75,8 @@ CREATE TRIGGER update_users_updated_at
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
 
+
+
 -- Insert demo data (optional)
 INSERT INTO users (email, name, google_id) 
 VALUES ('demo@example.com', 'Demo User', 'google_demo_123')
@@ -79,4 +91,6 @@ SELECT
     CURRENT_TIMESTAMP + INTERVAL '24 hours'
 FROM users u 
 WHERE u.email = 'demo@example.com'
-ON CONFLICT DO NOTHING; 
+ON CONFLICT DO NOTHING;
+
+ 

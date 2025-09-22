@@ -1,28 +1,22 @@
 from schemas import LLMChatRequest, LLMChatResponse
-from .groq_service import groq_service
+from .gemini_service import gemini_service
 import random
 
 class LLMService:
     def __init__(self):
-        self.question_flow = [
-            "What is your name?",
-            "What project are you working on?",
-            "What are the main goals for this sprint?",
-            "How many team members are involved?",
-            "What is the estimated duration for this sprint?",
-            "What are the main challenges you anticipate?",
-            "What resources do you need for this sprint?",
-            "What are the success criteria for this sprint?"
-        ]
         self.current_question_index = 0
         self.user_context = {}
     
-    def chat(self, request: dict) -> dict:
+    def chat(self, request: dict, prompt_data: str = None) -> dict:
         """Mock LLM chat that simulates dynamic question generation"""
         try:
             message = request.get("message", "").lower()
             context = request.get("context", [])
             user_info = request.get("user_info", {})
+            
+            # Use prompt data if provided
+            if prompt_data:
+                print(f"[TERMINAL LOG] LLM Service: Using prompt data from main flow for chat: {prompt_data[:100]}...")
             
             # Extract user name from context if available
             user_name = self._extract_user_name(context)
@@ -86,10 +80,14 @@ class LLMService:
         user_responses = [r for r in context if r.get("type") == "user"]
         return len(user_responses)
     
-    def generate_sprint_plan(self, conversation_history: list) -> dict:
-        """Generate sprint plan using GROQ"""
+    def generate_sprint_plan(self, conversation_history: list, prompt_data: str = None) -> dict:
+        """Generate sprint plan using Gemini"""
         try:
-            # Convert conversation history to GROQ format
+            # Use prompt data if provided
+            if prompt_data:
+                print(f"[TERMINAL LOG] LLM Service: Using prompt data from main flow for sprint plan generation: {prompt_data[:100]}...")
+            
+            # Convert conversation history to Gemini format
             messages = []
             for msg in conversation_history:
                 if msg.get("type") == "user":
@@ -97,8 +95,8 @@ class LLMService:
                 elif msg.get("type") == "llm":
                     messages.append({"role": "assistant", "content": msg.get("message", "")})
             
-            # Generate sprint plan using GROQ
-            result = groq_service.generate_sprint_plan(messages)
+            # Generate sprint plan using Gemini with prompt data
+            result = gemini_service.generate_sprint_plan(messages, prompt_data)
             
             if result["success"]:
                 return {
@@ -117,6 +115,44 @@ class LLMService:
             return {
                 "success": False,
                 "summary": f"Error generating sprint plan: {str(e)}",
+                "error": str(e)
+            }
+
+    def generate_risk_assessment(self, conversation_history: list, prompt_data: str = None) -> dict:
+        """Generate risk assessment using Gemini"""
+        try:
+            # Use prompt data if provided
+            if prompt_data:
+                print(f"[TERMINAL LOG] LLM Service: Using prompt data from main flow for risk assessment generation: {prompt_data[:100]}...")
+            
+            # Convert conversation history to Gemini format
+            messages = []
+            for msg in conversation_history:
+                if msg.get("type") == "user":
+                    messages.append({"role": "user", "content": msg.get("message", "")})
+                elif msg.get("type") == "llm":
+                    messages.append({"role": "assistant", "content": msg.get("message", "")})
+            
+            # Generate risk assessment using Gemini with prompt data
+            result = gemini_service.generate_risk_assessment(messages, prompt_data)
+            
+            if result["success"]:
+                return {
+                    "success": True,
+                    "summary": result["response"],
+                    "usage": result.get("usage", {})
+                }
+            else:
+                return {
+                    "success": False,
+                    "summary": result["response"],
+                    "error": result.get("error", "Unknown error")
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "summary": f"Error generating risk assessment: {str(e)}",
                 "error": str(e)
             }
 

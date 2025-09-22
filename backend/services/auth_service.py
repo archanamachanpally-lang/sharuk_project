@@ -13,8 +13,12 @@ class AuthService:
         self.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         self.google_redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
     
-    def get_google_auth_url(self) -> str:
+    def get_google_auth_url(self, prompt: str = None) -> str:
         """Generate Google OAuth URL"""
+        # Check if Google OAuth is properly configured
+        if not self.google_client_id or not self.google_redirect_uri:
+            raise ValueError("Google OAuth not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_REDIRECT_URI environment variables.")
+        
         params = {
             'client_id': self.google_client_id,
             'redirect_uri': self.google_redirect_uri,
@@ -22,6 +26,10 @@ class AuthService:
             'response_type': 'code',
             'access_type': 'offline'
         }
+        
+        # Add prompt parameter if provided (e.g., 'select_account' for account selection)
+        if prompt:
+            params['prompt'] = prompt
         
         auth_url = "https://accounts.google.com/o/oauth2/auth"
         query_string = "&".join([f"{k}={v}" for k, v in params.items()])

@@ -1,0 +1,266 @@
+/* Weekly Status Report Page Design */
+.weekly-status-report-page {
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, #f4f8fc, #e3eeff);
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #333;
+  padding: 0;
+  overflow-y: auto;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header and Navigation */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  padding: 20px 0;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 20px;
+  padding-right: 20px;
+  position: relative;
+}
+
+.welcome-section {
+  text-align: center;
+  flex-grow: 1;
+}
+
+.welcome-section h1 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-align: center;
+  flex-grow: 1;
+  width: 100%;
+}
+
+.welcome-section p {
+  margin: 10px 0 0 0;
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.back-btn {
+  padding: 10px 20px;
+  font-size: 14px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Main Content Card */
+.main-content {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e1e8ed;
+  padding: 40px;
+  margin-bottom: 30px;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.section-title {
+  color: #2c3e50;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.section-description {
+  color: #6b7280;
+  font-size: 1.1rem;
+  margin-bottom: 40px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Feature Benefits */
+.feature-benefits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+  margin: 40px 0;
+}
+
+.benefit-item {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 2px solid #e1e8ed;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.benefit-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: #667eea;
+}
+
+.benefit-item h3 {
+  color: #2c3e50;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.benefit-item p {
+  color: #6b7280;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Coming Soon Message */
+.coming-soon-message {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 2px solid #e1e8ed;
+  border-radius: 12px;
+  padding: 32px;
+  margin-top: 40px;
+  text-align: center;
+}
+
+.coming-soon-message h3 {
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.coming-soon-message p {
+  color: #6b7280;
+  font-size: 1rem;
+  margin-bottom: 24px;
+}
+
+/* Buttons */
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0d4dfb 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(13, 77, 251, 0.3);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(13, 77, 251, 0.4);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.3);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+  
+  .header {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+    padding: 15px 20px;
+    position: relative;
+  }
+  
+  .header h1 {
+    font-size: 24px;
+    order: 2;
+    width: 100%;
+  }
+
+  .back-btn {
+    order: 1;
+    align-self: flex-start;
+    position: static;
+    transform: none;
+    left: auto;
+    top: auto;
+  }
+  
+  .welcome-section h1 {
+    font-size: 2rem;
+  }
+  
+  .main-content {
+    padding: 24px;
+  }
+  
+  .section-title {
+    font-size: 1.5rem;
+  }
+  
+  .feature-benefits {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .benefit-item {
+    padding: 20px;
+  }
+  
+  .coming-soon-message {
+    padding: 24px;
+  }
+}

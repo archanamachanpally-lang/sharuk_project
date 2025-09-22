@@ -1,0 +1,13 @@
+sprint_number,sprint_dates,sprint_duration,team_name,sprint_goal,working_hours_per_person,team_member_availability,historical_story_points,pbi_summary,pbi_criteria,pbi_priority,pbi_effort,definition_of_done,risks_and_dependencies,created_at
+22,september 1st ,90days,shaik team,to complete project on time,40 hours,45 hours,2,2,2,2,2,2,2,2025-08-05T08:59:45.113497
+12345,Novemeber 1st,180 days,Thunder team,to complete the project,80 hours,150 hours last sprint,80,summary,not specified,High,Full,Done,No risk as of now,2025-08-05T09:06:51.161873
+2,2,2,2,2,2,2,2,2,2,2,2,2,2,2025-08-05T14:26:36.096827
+2,2,2,2,2,2,2,2,2,2,2,2,2,2,2025-08-06T08:36:20.063468
+2,2,2,2,2,2,2,2,2,2,2,2,2,2,2025-08-06T08:40:50.763340
+2,2,2,2,2,2,2,2,2,2,2,2,2,2,2025-08-06T08:50:53.664633
+3,3,3,3,3,3,4,4,4,4,4,5,4,5,2025-08-06T08:52:16.839991
+2,2,2,2,2,24,4,4,4,4,4,4,5,5,2025-08-06T08:59:15.206239
+2,2,2,2,2,2,2,2,2,3,3,3,3,3,2025-08-06T09:09:15.532893
+2,2,2,2,2,2,4,4,4,4,4,4,5,5,2025-08-06T09:24:09.561622
+1,1,1,1,1,1,1,1,1,1,1,2,2,2,2025-08-06T12:42:45.192061
+2,2,2,2,2,2,2,2,2,2,2,2,2,2,2025-08-06T13:02:21.548212

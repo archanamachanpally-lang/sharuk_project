@@ -9,4 +9,8 @@ passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
-httpx==0.25.2 
+httpx==0.25.2
+requests==2.31.0
+reportlab==4.0.7
+PyPDF2==3.0.1
+pdfplumber==0.10.3

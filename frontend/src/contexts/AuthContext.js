@@ -60,7 +60,15 @@ export const AuthProvider = ({ children }) => {
     try {
       // Get Google OAuth URL from backend
       const response = await axios.get('/api/auth/google/url');
-      const { auth_url } = response.data;
+      const { auth_url, error } = response.data;
+      
+      if (error || !auth_url) {
+        console.error('Google OAuth configuration error:', error);
+        return { 
+          success: false, 
+          message: error || 'Google OAuth not configured. Please contact your administrator.' 
+        };
+      }
       
       // Redirect to Google OAuth
       window.location.href = auth_url;
