@@ -93,7 +93,7 @@ const FeedbackPage = () => {
       console.log('📝 [FEEDBACK] Prepared data for API:', feedbackData);
       
       // Submit to API
-      const response = await fetch('/api/feedback', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

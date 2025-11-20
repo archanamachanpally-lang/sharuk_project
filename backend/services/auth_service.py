@@ -46,8 +46,19 @@ class AuthService:
             'redirect_uri': self.google_redirect_uri
         }
         
+        print(f"🔐 [AUTH-SERVICE] Exchanging code for token...")
+        print(f"🔐 [AUTH-SERVICE] Redirect URI: {self.google_redirect_uri}")
+        print(f"🔐 [AUTH-SERVICE] Client ID: {self.google_client_id[:20] if self.google_client_id else 'None'}...")
+        
         response = requests.post(token_url, data=data)
-        return response.json()
+        result = response.json()
+        
+        if 'error' in result:
+            print(f"❌ [AUTH-SERVICE] Token exchange error: {result.get('error')} - {result.get('error_description', 'No description')}")
+        else:
+            print(f"✅ [AUTH-SERVICE] Token exchange successful")
+        
+        return result
     
     def get_user_info(self, access_token: str) -> dict:
         """Get user information from Google"""

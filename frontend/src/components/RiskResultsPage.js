@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import './RiskResultsPage.css';
 
@@ -33,14 +34,29 @@ const RiskResultsPage = () => {
 
   // State for SOW functionality
   const [hasUploadedNewSow, setHasUploadedNewSow] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [selectedSowFile, setSelectedSowFile] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [sowFileName, setSowFileName] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [sowFileContent, setSowFileContent] = useState('');
 
   // State for validate plan modal
   const [showValidateModal, setShowValidateModal] = useState(false);
   const [showValidationResult, setShowValidationResult] = useState(false);
   const [validationResult, setValidationResult] = useState('');
+
+  // State for version tracking
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [planVersions, setPlanVersions] = useState([]);
+  const [currentVersionNumber, setCurrentVersionNumber] = useState(1);
+  
+  // State for share functionality
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareDescription, setShareDescription] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [showSentMessage, setShowSentMessage] = useState(false);
   
   // Ref for the contenteditable div
   const contentEditableRef = useRef(null);
@@ -60,12 +76,89 @@ const RiskResultsPage = () => {
   const generatedAssessment = riskAssessment?.response || riskAssessment?.summary || riskAssessment?.word_document;
   const userInputs = originalData;
   
-  // Load the generated assessment when component mounts
+  // Load the generated assessment when component mounts - only once
   React.useEffect(() => {
-    if (generatedAssessment) {
+    if (generatedAssessment && planVersions.length === 0) {
       setCurrentGeneratedAssessment(generatedAssessment);
+      // Initialize version tracking with the first version
+      initializeVersionTracking(generatedAssessment);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedAssessment]);
+
+  // Initialize version tracking with the first version
+  const initializeVersionTracking = (initialAssessment) => {
+    // Create a deep copy of the initial assessment content
+    // CRITICAL: Force create a NEW string copy to prevent reference sharing
+    let initialContent;
+    if (typeof initialAssessment === 'string') {
+      initialContent = String(initialAssessment).slice();
+    } else {
+      initialContent = JSON.parse(JSON.stringify(initialAssessment));
+    }
+    
+    // Verify it's a proper copy
+    console.log('📚 [VERSION] Original assessment length:', initialAssessment?.length || 0);
+    console.log('📚 [VERSION] Initial content length:', initialContent?.length || 0);
+    console.log('📚 [VERSION] Same reference?', initialAssessment === initialContent);
+    
+    const initialVersion = {
+      versionNumber: 1,
+      content: initialContent,
+      timestamp: new Date().toLocaleString(),
+      action: 'Initial Generation',
+      description: 'Risk assessment generated successfully'
+    };
+    setPlanVersions([initialVersion]);
+    setCurrentVersionNumber(1);
+    console.log('📚 [VERSION] Initialized version tracking with version 1');
+    console.log('📚 [VERSION] Stored content length:', initialContent?.length || 0);
+  };
+
+  // Add new version when assessment is modified
+  const addNewVersion = (newContent, action, description) => {
+    setPlanVersions(prev => {
+      const newVersionNumber = prev.length > 0 ? prev[prev.length - 1].versionNumber + 1 : currentVersionNumber + 1;
+      
+      // Create a deep copy of the content to avoid reference issues
+      // CRITICAL: Always create a NEW string copy to prevent reference sharing
+      let contentCopy;
+      if (typeof newContent === 'string') {
+        // Force create a new string via String() and slice()
+        contentCopy = String(newContent).slice();
+      } else {
+        contentCopy = JSON.parse(JSON.stringify(newContent));
+      }
+      
+      // Double-check we have a proper copy (not a reference)
+      console.log(`📚 [VERSION] Original content length: ${newContent?.length || 0}`);
+      console.log(`📚 [VERSION] Copy content length: ${contentCopy?.length || 0}`);
+      console.log(`📚 [VERSION] Same reference? ${newContent === contentCopy}`);
+      
+      const newVersion = {
+        versionNumber: newVersionNumber,
+        content: contentCopy,
+        timestamp: new Date().toLocaleString(),
+        action: action,
+        description: description
+      };
+      
+      // Create a new array with a new object, don't mutate
+      const updatedVersions = [...prev, newVersion];
+      setCurrentVersionNumber(newVersionNumber);
+      
+      console.log(`📚 [VERSION] Added version ${newVersionNumber}: ${action} - ${description}`);
+      console.log(`📚 [VERSION] Total versions: ${updatedVersions.length}`);
+      console.log(`📚 [VERSION] Stored content length: ${contentCopy?.length || 0}`);
+      
+      return updatedVersions;
+    });
+  };
+
+  // Handle version modal
+  const handleVersionModal = () => {
+    setShowVersionModal(true);
+  };
 
   useEffect(() => {
     try {
@@ -110,7 +203,7 @@ const RiskResultsPage = () => {
       delete window.handleAddComment;
       delete window.handleSaveComment;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Authentication check
   React.useEffect(() => {
@@ -139,7 +232,7 @@ const RiskResultsPage = () => {
   };
 
   const handleViewExistingAssessments = () => {
-    navigate('/existing-assessments');
+    navigate('/existing-risk-assessments');
   };
 
   // Handle regenerating the risk assessment
@@ -196,7 +289,7 @@ const RiskResultsPage = () => {
 
       console.log('🔄 Sending regeneration request:', regenerateRequest);
 
-      const response = await fetch('/api/risk-assessment/generate-assessment', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/risk-assessment/generate-assessment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -213,7 +306,11 @@ const RiskResultsPage = () => {
         console.log('✅ Risk assessment regenerated successfully');
         
         // Update the current assessment with the new content
-        setCurrentGeneratedAssessment(result.response);
+        const regeneratedContent = result.response;
+        setCurrentGeneratedAssessment(regeneratedContent);
+        
+        // Add new version for the regeneration
+        addNewVersion(regeneratedContent, 'SOW Regeneration', 'Assessment regenerated with updated SOW content');
         
         // Update the risk assessment in state
         const updatedRiskAssessment = {
@@ -276,7 +373,7 @@ const RiskResultsPage = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/upload/sow', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/upload/sow`, {
         method: 'POST',
         body: formData,
       });
@@ -316,49 +413,19 @@ const RiskResultsPage = () => {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const readPDFContent = async (file) => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const arrayBuffer = e.target.result;
-          const pdf = await import('pdfjs-dist');
-          const loadingTask = pdf.getDocument({ data: arrayBuffer });
-          const pdfDoc = await loadingTask.promise;
-          
-          let fullText = '';
-          for (let i = 1; i <= pdfDoc.numPages; i++) {
-            const page = await pdfDoc.getPage(i);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(' ');
-            fullText += pageText + '\n';
-          }
-          
-          resolve(fullText);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
+      // Function disabled - pdfjs-dist not available in build
+      reject(new Error('PDF reading functionality disabled'));
     });
   };
 
+  // eslint-disable-next-line no-unused-vars
   const readDOCXContent = async (file) => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const arrayBuffer = e.target.result;
-          const mammoth = await import('mammoth');
-          const result = await mammoth.extractRawText({ arrayBuffer });
-          resolve(result.value);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
+      // Function disabled - mammoth not available in build
+      reject(new Error('DOCX reading functionality disabled'));
     });
   };
 
@@ -435,7 +502,7 @@ const RiskResultsPage = () => {
       }, 200);
 
       // Call validation endpoint
-      const response = await fetch('/api/risk/validate-assessment', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/risk/validate-assessment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -659,10 +726,35 @@ Please update the HTML content according to the instructions above. Return only 
         
         // Overwrite the existing generated_assessment with new HTML
         const updatedHtml = response.response;
-        setCurrentGeneratedAssessment(updatedHtml);
+        
+        // Check if content actually changed
+        const hasChanged = currentGeneratedAssessment !== updatedHtml;
+        console.log('💾 [LLM] Content changed:', hasChanged);
+        console.log('💾 [LLM] Current assessment length:', currentGeneratedAssessment?.length || 0);
+        console.log('💾 [LLM] Updated HTML length:', updatedHtml?.length || 0);
+        console.log('💾 [LLM] Content is same object?', currentGeneratedAssessment === updatedHtml);
+        
+        // Create a DEEP copy to avoid reference issues with stored versions
+        // IMPORTANT: Always create a fresh string copy, never reuse references
+        const htmlCopy = String(updatedHtml).slice(); // Ensure it's a string and create new copy
+        
+        // Verify it's a different reference
+        console.log('💾 [LLM] HTML copy is same as original?', htmlCopy === updatedHtml);
+        console.log('💾 [LLM] HTML copy length:', htmlCopy?.length || 0);
+        
+        // Update the current generated assessment with the copied content
+        setCurrentGeneratedAssessment(htmlCopy);
         
         // Also update the updatedAssessmentWithComments for consistency
-        setUpdatedAssessmentWithComments(updatedHtml);
+        setUpdatedAssessmentWithComments(htmlCopy);
+        
+        // Only add new version if content actually changed
+        if (hasChanged) {
+          // Pass the copy to addNewVersion to ensure it stores an independent copy
+          addNewVersion(htmlCopy, 'AI Comment Edit', `Assessment updated based on comment: "${comment.trim()}"`);
+        } else {
+          console.log('💾 [LLM] No changes detected, skipping version creation');
+        }
         
         console.log('💾 [LLM] Generated assessment updated with new HTML content');
         
@@ -734,8 +826,31 @@ Please update the HTML content according to the instructions above. Return only 
       console.log('💾 [SAVE ASSESSMENT] Original edited assessment:', updatedAssessment.substring(0, 200));
       console.log('💾 [SAVE ASSESSMENT] Final cleaned assessment:', cleanedAssessment.substring(0, 200));
       
-      // Update the current generated assessment with the cleaned content
-      setCurrentGeneratedAssessment(cleanedAssessment);
+      // Check if content actually changed
+      const hasChanged = currentGeneratedAssessment !== cleanedAssessment;
+      console.log('💾 [SAVE ASSESSMENT] Content changed:', hasChanged);
+      console.log('💾 [SAVE ASSESSMENT] Current assessment length:', currentGeneratedAssessment?.length || 0);
+      console.log('💾 [SAVE ASSESSMENT] Cleaned assessment length:', cleanedAssessment?.length || 0);
+      console.log('💾 [SAVE ASSESSMENT] Content is same object?', currentGeneratedAssessment === cleanedAssessment);
+      
+      // Create a DEEP copy to avoid reference issues with stored versions
+      // IMPORTANT: Always create a fresh string copy, never reuse references
+      const assessmentCopy = String(cleanedAssessment).slice(); // Ensure it's a string and create new copy
+      
+      // Verify it's a different reference
+      console.log('💾 [SAVE ASSESSMENT] Assessment copy is same as original?', assessmentCopy === cleanedAssessment);
+      console.log('💾 [SAVE ASSESSMENT] Assessment copy length:', assessmentCopy?.length || 0);
+      
+      // Update the current generated assessment with the copied content
+      setCurrentGeneratedAssessment(assessmentCopy);
+      
+      // Only add new version if content actually changed
+      if (hasChanged) {
+        // Pass the copy to addNewVersion to ensure it stores an independent copy
+        addNewVersion(assessmentCopy, 'Manual Edit', 'Assessment edited manually by user');
+      } else {
+        console.log('💾 [SAVE ASSESSMENT] No changes detected, skipping version creation');
+      }
       
       // Here you would typically save to backend
       // For now, we'll just update the local state
@@ -945,6 +1060,62 @@ Please update the HTML content according to the instructions above. Return only 
     return cleaned;
   };
 
+  // Handle email sharing
+  const handleSendEmail = async () => {
+    if (!shareEmail || !shareEmail.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    // Close the modal first to show loading animation
+    setShowShareModal(false);
+    
+    // Small delay to ensure modal closes
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    setSendingEmail(true);
+    try {
+      // Get the risk assessment name (from originalData or use a default)
+      const assessmentName = originalData?.project_overview?.ProjectName || 'Risk Assessment';
+      
+      // Create subject with format: "risk assessment shared : {assessment_name}"
+      const subject = `risk assessment shared : ${assessmentName}`;
+      
+      // Prepare email data
+      const emailData = {
+        to: shareEmail,
+        subject: subject,
+        body: shareDescription || 'Please find the risk assessment below.',
+        riskAssessmentContent: currentGeneratedAssessment,
+        assessmentName: assessmentName
+      };
+
+      // Get email content from backend
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/send-risk-assessment-email`, emailData);
+
+      if (response.data.success) {
+        setShareEmail('');
+        setShareDescription('');
+        
+        // Show sent message in middle of screen
+        setShowSentMessage(true);
+        
+        // Auto hide after 3 seconds
+        setTimeout(() => {
+          setShowSentMessage(false);
+        }, 3000);
+      } else {
+        setSendingEmail(false); // Stop loading if failed
+        alert(`❌ ${response.data.message || 'Failed to send email'}`);
+      }
+    } catch (error) {
+      console.error('Error generating email:', error);
+      alert('Failed to generate email. Please try again.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   // Function to create header mappings from the assessment content
   const createHeaderMappings = (assessmentContent) => {
     if (!assessmentContent) return;
@@ -1105,7 +1276,7 @@ Please update the HTML content according to the instructions above. Return only 
     try {
       console.log('🤖 [LLM] Starting Gemini LLM service call...');
       console.log('🤖 [LLM] Prompt preview:', prompt.substring(0, 200) + '...');
-      const response = await fetch('/api/gemini/chat', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/gemini/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -1179,15 +1350,20 @@ Please update the HTML content according to the instructions above. Return only 
           <h1>Risk Assessment Generated Successfully!</h1>
           <p>Your comprehensive risk assessment has been generated and saved to the database.</p>
         </div>
-        <button className="feedback-btn" onClick={() => navigate('/feedback', { 
-          state: {
-            riskAssessment: riskAssessment,
-            originalData: originalData,
-            sowData: sowData
-          }
-        })}>
-          FEEDBACK
-        </button>
+        <div className="header-actions">
+          <button className="feedback-btn" onClick={() => navigate('/feedback', { 
+            state: {
+              riskAssessment: riskAssessment,
+              originalData: originalData,
+              sowData: sowData
+            }
+          })}>
+            FEEDBACK
+          </button>
+          <button className="share-btn" onClick={() => setShowShareModal(true)}>
+            SHARE
+          </button>
+        </div>
       </div>
 
       <div className="results-content">
@@ -1195,16 +1371,18 @@ Please update the HTML content according to the instructions above. Return only 
           <div className="plan-header">
             <h2>Generated Risk Assessment</h2>
             {!isEditing && (
-              <div style={{ display: 'flex', gap: '1px' }}>
-                <button className="btn btn-info btn-sm" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleCommentsMode}>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                <button className="btn btn-info btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={handleCommentsMode}>
                   💬 Comments
                 </button>
-                <button className="btn btn-warning btn-sm edit-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleEditAssessment}>
+                <button className="btn btn-warning btn-sm edit-btn" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={handleEditAssessment}>
                   ✏️ Edit
                 </button>
-                {/* Always show SOW Doc button */}
-                <button className="btn btn-success btn-sm" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setShowSowModal(true)}>
+                <button className="btn btn-success btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => setShowSowModal(true)}>
                  SOW Doc
+                </button>
+                <button className="btn btn-primary btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={handleVersionModal}>
+                  📚 Version {currentVersionNumber}
                 </button>
               </div>
             )}
@@ -1618,6 +1796,346 @@ Please update the HTML content according to the instructions above. Return only 
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Version History Modal */}
+      {showVersionModal && (
+        <div className="loading-overlay" onClick={() => setShowVersionModal(false)}>
+          <div className="version-modal" onClick={(e) => e.stopPropagation()} style={{ 
+            maxWidth: '1200px', 
+            width: '95%', 
+            background: '#fff', 
+            borderRadius: '12px', 
+            padding: '20px', 
+            border: '1px solid #e5e7eb',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #e5e7eb', paddingBottom: '15px' }}>
+              <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '600', color: '#1f2937' }}>📚 Assessment Version History</h3>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowVersionModal(false)}
+                style={{ padding: '8px 16px', fontSize: '14px' }}
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Version List */}
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {planVersions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                  <p>No versions available yet.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {planVersions.map((version, index) => (
+                    <div 
+                      key={version.versionNumber} 
+                      style={{ 
+                        border: version.versionNumber === currentVersionNumber ? '2px solid #3182ce' : '1px solid #e5e7eb', 
+                        borderRadius: '8px', 
+                        padding: '15px',
+                        backgroundColor: version.versionNumber === currentVersionNumber ? '#f0f9ff' : '#fff',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={() => {
+                        // Create a copy of the version content to avoid reference issues
+                        const restoredContent = typeof version.content === 'string' ? version.content.slice() : JSON.parse(JSON.stringify(version.content));
+                        setCurrentGeneratedAssessment(restoredContent);
+                        setCurrentVersionNumber(version.versionNumber);
+                        setShowVersionModal(false);
+                        
+                        console.log(`📚 [VERSION] Restored version ${version.versionNumber}`);
+                        console.log(`📚 [VERSION] Restored content length: ${restoredContent?.length || 0}`);
+                      }}
+                    >
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ 
+                            fontWeight: '600', 
+                            fontSize: '16px',
+                            color: version.versionNumber === currentVersionNumber ? '#3182ce' : '#1f2937'
+                          }}>
+                            Version {version.versionNumber}
+                            {version.versionNumber === currentVersionNumber && ' (Current)'}
+                          </span>
+                          <span style={{ 
+                            fontSize: '12px', 
+                            color: '#6b7280',
+                            background: '#f3f4f6',
+                            padding: '2px 8px',
+                            borderRadius: '4px'
+                          }}>
+                            {version.action}
+                          </span>
+                        </div>
+                        <span style={{ 
+                          fontSize: '12px', 
+                          color: '#6b7280' 
+                        }}>
+                          {version.timestamp}
+                        </span>
+                      </div>
+                      
+                      <p style={{ 
+                        margin: '0', 
+                        fontSize: '14px', 
+                        color: '#4b5563',
+                        lineHeight: '1.4'
+                      }}>
+                        {version.description}
+                      </p>
+                      
+                      {/* Preview of content */}
+                      <div style={{ 
+                        marginTop: '10px',
+                        padding: '8px',
+                        background: '#f9fafb',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        color: '#6b7280',
+                        maxHeight: '60px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {version.content.substring(0, 200)}...
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ 
+              marginTop: '20px',
+              paddingTop: '15px',
+              borderTop: '1px solid #e5e7eb',
+              textAlign: 'center',
+              color: '#6b7280',
+              fontSize: '14px'
+            }}>
+              <p style={{ margin: '0' }}>
+                Click on any version to restore it as the current assessment
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="loading-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="validate-modal" onClick={(e) => e.stopPropagation()} style={{ 
+            maxWidth: '600px', 
+            width: '90%', 
+            background: '#fff', 
+            borderRadius: '12px', 
+            padding: '30px', 
+            border: '1px solid #e5e7eb',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '20px',
+              paddingBottom: '15px',
+              borderBottom: '2px solid #e5e7eb'
+            }}>
+              <h2 style={{ margin: 0, color: '#1f2937', fontSize: '20px', fontWeight: '600' }}>
+                Share Risk Assessment via Email
+              </h2>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowShareModal(false)}
+                style={{ padding: '8px 16px', fontSize: '14px' }}
+              >
+                ✕ Close
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ marginBottom: '15px', color: '#6b7280', fontSize: '14px' }}>
+                📧 This will send an email with your description as the message body and the risk assessment as a PDF attachment.
+              </p>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label htmlFor="shareEmail" style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: '600', 
+                color: '#374151',
+                fontSize: '14px'
+              }}>
+                Recipient Email *
+              </label>
+              <input
+                type="email"
+                id="shareEmail"
+                value={shareEmail}
+                onChange={(e) => setShareEmail(e.target.value)}
+                placeholder="Enter recipient email address"
+                required
+                disabled={sendingEmail}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '25px' }}>
+              <label htmlFor="shareDescription" style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontWeight: '600', 
+                color: '#374151',
+                fontSize: '14px'
+              }}>
+                Description
+              </label>
+              <textarea
+                id="shareDescription"
+                value={shareDescription}
+                onChange={(e) => setShareDescription(e.target.value)}
+                placeholder="Enter description for the email body"
+                rows={4}
+                disabled={sendingEmail}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  outline: 'none',
+                  resize: 'vertical',
+                  transition: 'border-color 0.2s'
+                }}
+              />
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '10px', 
+              justifyContent: 'flex-end'
+            }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowShareModal(false)}
+                disabled={sendingEmail}
+                style={{ 
+                  padding: '12px 24px', 
+                  fontSize: '14px', 
+                  fontWeight: '500',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleSendEmail}
+                disabled={!shareEmail || sendingEmail}
+                style={{ 
+                  padding: '12px 24px', 
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: '#3182ce',
+                  color: 'white',
+                  opacity: (!shareEmail || sendingEmail) ? 0.5 : 1,
+                  transition: 'opacity 0.2s'
+                }}
+              >
+                {sendingEmail ? 'Sending...' : 'Send Email'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Animation while sending */}
+      {sendingEmail && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '40px',
+            borderRadius: '12px',
+            textAlign: 'center',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }}>
+            <div className="loading-ring-large"></div>
+            <h3 style={{ marginTop: '20px', color: '#1f2937', fontSize: '18px', fontWeight: '600' }}>
+              Sending Email...
+            </h3>
+          </div>
+        </div>
+      )}
+
+      {/* Sent Message Success Overlay */}
+      {showSentMessage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '40px 60px',
+            borderRadius: '12px',
+            textAlign: 'center',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            animation: 'fadeIn 0.3s ease-in'
+          }}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>✅</div>
+            <h2 style={{ margin: 0, color: '#10b981', fontSize: '24px', fontWeight: '700' }}>
+              Sent!
+            </h2>
+            <p style={{ margin: '10px 0 0 0', color: '#6b7280', fontSize: '16px' }}>
+              Risk assessment sent successfully
+            </p>
           </div>
         </div>
       )}

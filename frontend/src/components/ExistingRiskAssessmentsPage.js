@@ -27,13 +27,47 @@ const ExistingRiskAssessmentsPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredAssessments, setFilteredAssessments] = useState([]);
   
+  // Workspace filter state
+  const [workspaces, setWorkspaces] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState('Created by Me');
+  
   // Get user email once at component level
   const userEmail = user ? user.email : 'demo@example.com';
   
+  // Fetch workspaces
+  useEffect(() => {
+    const fetchWorkspaces = async () => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/workspaces`);
+        const data = await response.json();
+        if (data.success) {
+          setWorkspaces(data.workspaces || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch workspaces:', err);
+      }
+    };
+    fetchWorkspaces();
+  }, []);
+
   const fetchAssessments = useCallback(async () => {
     try {
-      // Fetch risk assessments for the current user only
-      const response = await fetch(`/api/risk-assessments?user_email=${encodeURIComponent(userEmail)}`);
+      // Build query parameters
+      let url = `${process.env.REACT_APP_API_URL}/api/risk-assessments`;
+      const params = new URLSearchParams();
+      
+      if (selectedFilter === 'Created by Me') {
+        params.append('filter_type', 'Created by Me');
+        params.append('user_email', userEmail);
+      } else {
+        params.append('workspace', selectedFilter);
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await fetch(url);
       const data = await response.json();
       
       if (data.success) {
@@ -49,7 +83,7 @@ const ExistingRiskAssessmentsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [userEmail]);
+  }, [userEmail, selectedFilter]);
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -354,7 +388,7 @@ const ExistingRiskAssessmentsPage = () => {
     if (!assessmentToDelete) return;
     
     try {
-      const response = await fetch(`/api/risk-assessments/${assessmentToDelete.id}?user_email=${encodeURIComponent(userEmail)}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/risk-assessments/${assessmentToDelete.id}?user_email=${encodeURIComponent(userEmail)}`, {
         method: 'DELETE',
       });
       
@@ -448,8 +482,28 @@ const ExistingRiskAssessmentsPage = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Filter and Search Bar */}
         <div className="search-container">
+          <div className="filter-wrapper">
+            <label htmlFor="workspaceFilterRisk" className="filter-label">Select Filter:</label>
+            <select
+              id="workspaceFilterRisk"
+              value={selectedFilter}
+              onChange={(e) => {
+                setSelectedFilter(e.target.value);
+                setCurrentPage(1); // Reset to first page when filter changes
+              }}
+              className="workspace-filter"
+            >
+              <option value="Created by Me">Created by Me</option>
+              {workspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.name}>
+                  {workspace.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
           <div className="search-wrapper">
             <div className="search-input-group">
               <input

@@ -71,7 +71,8 @@ Present the Risk Register as a clear, structured list. Each risk should be a sep
 </div>
 
 CRITICAL INSTRUCTIONS:
-- Generate ONLY the Risk Register section
+- Generate the Risk Register section with ALL provided risks
+- After the Risk Register, include a Risk Confidence section
 - Do NOT include Executive Summary, Project Overview, Risk Categories Analysis, Stakeholder Assessment, Risk Matrix, or any other sections
 - Handle ALL provided risks in the all_risks_data array
 - Each risk must be wrapped in a <div class="risk-section"> with proper HTML formatting
@@ -81,7 +82,22 @@ CRITICAL INSTRUCTIONS:
 - Focus only on the 8 specified fields for each risk
 - Do NOT include any validation messages or status indicators
 
-Generate a clean, professional Risk Register with proper HTML sections for each risk."""
+RISK CONFIDENCE SECTION:
+After completing the Risk Register, add a Risk Confidence section with the following format:
+   <div class="risk-confidence-section">
+   <h2>Risk Confidence</h2>
+   <p><strong>Confidence Score:</strong> [Provide a score out of 10 or percentage] for achieving the Sprint Goal</p>
+   <p><strong>Rationale:</strong> [Brief explanation of the confidence score, considering the identified risks, severity levels, mitigation plans, and team capacity]</p>
+   </div>
+
+The confidence score should:
+- Be based on comprehensive analysis of all identified risks
+- Consider risk severity (High/Medium/Low) and their potential impact
+- Evaluate the effectiveness of mitigation plans
+- Take into account team capacity and project scope
+- Provide actionable insights for stakeholders
+
+Generate a clean, professional Risk Register followed by the Risk Confidence section, all with proper HTML formatting."""
         }
     ]
     

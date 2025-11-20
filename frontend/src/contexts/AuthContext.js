@@ -42,6 +42,9 @@ export const AuthProvider = ({ children }) => {
       
       const demoSessionId = `demo_session_${Date.now()}`;
       
+      // Clear any existing workspace selection on login
+      localStorage.removeItem('selectedWorkspace');
+      
       setSessionId(demoSessionId);
       setUser(demoUser);
       
@@ -59,7 +62,7 @@ export const AuthProvider = ({ children }) => {
   const loginWithGoogle = async () => {
     try {
       // Get Google OAuth URL from backend
-      const response = await axios.get('/api/auth/google/url');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/auth/google/url`);
       const { auth_url, error } = response.data;
       
       if (error || !auth_url) {
@@ -90,6 +93,9 @@ export const AuthProvider = ({ children }) => {
       setSessionId(null);
       localStorage.removeItem('sessionId');
       localStorage.removeItem('user');
+      // Clear sessionStorage to reset chatbot fullscreen flags
+      sessionStorage.removeItem('hasShownFullscreenChat');
+      sessionStorage.removeItem('lastShownFullscreenChatUserId');
     }
   };
 

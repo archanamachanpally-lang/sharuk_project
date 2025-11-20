@@ -6,13 +6,19 @@ import './GoogleCallback.css';
 
 const GoogleCallback = () => {
   const [error, setError] = useState('');
-  const { setUser, setSessionId } = useAuth();
+  const { setUser, setSessionId, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const handleGoogleCallback = async () => {
       try {
+        // If user is already authenticated, redirect to home
+        if (isAuthenticated) {
+          navigate('/home');
+          return;
+        }
+
         const urlParams = new URLSearchParams(location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
@@ -27,25 +33,39 @@ const GoogleCallback = () => {
           return;
         }
 
-        const response = await axios.post('/api/auth/google/callback', { code });
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/google/callback`, { code });
 
         if (response.data.success) {
+          // Clear any existing workspace selection on Google login
+          localStorage.removeItem('selectedWorkspace');
+          // Clear chatbot session flags to ensure it shows on new login
+          sessionStorage.removeItem('hasShownFullscreenChat');
+          sessionStorage.removeItem('lastShownFullscreenChatUserId');
+          
           setUser(response.data.user);
           setSessionId(response.data.session_id);
           localStorage.setItem('user', JSON.stringify(response.data.user));
           localStorage.setItem('sessionId', response.data.session_id);
+          
+          // Clear the URL parameters to prevent back button issues
+          window.history.replaceState({}, document.title, '/callback');
           navigate('/home');
         } else {
           setError(response.data.message || 'Authentication failed.');
         }
       } catch (error) {
         console.error('Google callback error:', error);
-        setError('Authentication failed. Please try again.');
+        // Check if it's a token exchange error (expired code)
+        if (error.response?.status === 400) {
+          setError('Authentication session expired. Please try logging in again.');
+        } else {
+          setError('Authentication failed. Please try again.');
+        }
       }
     };
 
     handleGoogleCallback();
-  }, [location, navigate, setUser, setSessionId]);
+  }, [location, navigate, setUser, setSessionId, isAuthenticated]);
 
   if (error) {
     return (

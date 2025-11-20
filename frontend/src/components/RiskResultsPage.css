@@ -44,7 +44,61 @@
 
 .header-actions {
   display: flex;
-  gap: 15px;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.feedback-btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 25px;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  min-width: 100px;
+}
+
+.feedback-btn:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+}
+
+.feedback-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px rgba(102, 126, 234, 0.4);
+}
+
+.share-btn {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 25px;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: none;
+  color: white;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+  min-width: 100px;
+}
+
+.share-btn:hover {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+}
+
+.share-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4);
 }
 
 .btn {
@@ -522,4 +576,20 @@
     min-width: 120px;
     font-size: 0.9rem;
   }
+}
+
+/* Loading Ring Animation */
+.loading-ring-large {
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(49, 130, 206, 0.2);
+  border-top: 6px solid #3182ce;
+  border-radius: 50%;
+  animation: spin 1.2s ease-in-out infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

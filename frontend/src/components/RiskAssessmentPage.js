@@ -214,7 +214,7 @@ const RiskAssessmentPage = () => {
       setRisks([defaultRisk]);
       setAnswers(defaultRisk);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const populateFormWithDocxData = (docxData) => {
     console.log('DOCX data received (LLM format):', docxData);
@@ -428,6 +428,7 @@ const RiskAssessmentPage = () => {
     console.log('🔍 [EXCEL MAPPING] Final mapped risk data with N/A autofill:', risk);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const populateFormWithExcelData = (excelData) => {
     const newAnswers = { ...answers };
     
@@ -930,6 +931,9 @@ const RiskAssessmentPage = () => {
         `---\n`
       ).join('\n');
       
+      // Get the current workspace ID from localStorage
+      const selectedWorkspace = JSON.parse(localStorage.getItem('selectedWorkspace') || '{}');
+      
       const requestData = {
         project_overview: {
           ProjectName: primaryRisk.RiskID?.RiskIDValue || 'Multi-Risk Assessment Project',
@@ -960,11 +964,12 @@ const RiskAssessmentPage = () => {
           CommentsContent: `Comprehensive risk assessment covering ${risks.length} risks. All risks have been analyzed and included in this assessment.`
         },
         all_risks_data: allRisksData, // Include raw risk data for LLM processing
-        user_email: userEmail
+        user_email: userEmail,
+        workspace_id: selectedWorkspace?.id || null
       };
 
       
-      const response = await fetch('/api/risk-assessment/generate-assessment', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/risk-assessment/generate-assessment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1034,7 +1039,7 @@ const RiskAssessmentPage = () => {
     });
     
     setCompletedTabs(newCompletedTabs);
-  }, [answers]);
+  }, [answers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderContent = () => {
     if (!activeTab) {

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, JSON, ForeignKey, UniqueConstraint, LargeBinary
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
@@ -74,6 +74,9 @@ class SprintPlan(Base):
     # User who created this plan
     created_by = Column(String, index=True)  # Store user email
     
+    # Workspace for this plan - foreign key to workspaces table
+    workspace_id = Column(Integer, ForeignKey('workspaces.id'), nullable=True)
+    
     # PDF generation is now handled by frontend html2pdf.js
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -113,6 +116,9 @@ class RiskAssessment(Base):
     # User who created this assessment
     created_by = Column(String, index=True)  # Store user email
     
+    # Workspace for this assessment - foreign key to workspaces table
+    workspace_id = Column(Integer, ForeignKey('workspaces.id'), nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Document(Base):
@@ -122,6 +128,16 @@ class Document(Base):
     feature = Column(String, nullable=False)
     prompt = Column(Text, nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 class Feedback(Base):
     __tablename__ = "feedback"
@@ -152,4 +168,79 @@ class Feedback(Base):
     
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    created_by = Column(String, index=True)  # Store user email 
+    created_by = Column(String, index=True)  # Store user email
+
+class UploadedFile(Base):
+    __tablename__ = "uploaded_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String, nullable=False)
+    file_type = Column(String, nullable=False)  # pdf, docx, txt, etc.
+    file_path = Column(String, nullable=False)  # Path where file is stored
+    uploaded_by = Column(String, index=True)  # User email or username
+    upload_time = Column(DateTime(timezone=True), server_default=func.now())
+    status = Column(String, default="Uploaded")  # Uploaded, Processing, Processed, Error
+    extracted_text = Column(Text)  # Extracted text content from the file
+    indexing_status = Column(String, default="pending_index")  # pending_index, indexed, error
+
+class MandatoryFile(Base):
+    __tablename__ = "mandatory_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String, nullable=False)
+    file_type = Column(String, nullable=False)  # pdf, docx, txt, xlsx, etc.
+    file_path = Column(String, nullable=True)  # Legacy: Path where file was stored on disk (deprecated, kept for backward compatibility)
+    file_content = Column(LargeBinary, nullable=True)  # File content stored in database
+    file_size = Column(Integer)  # File size in bytes
+    uploaded_by = Column(String, index=True)  # User email or username
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+    description = Column(String)  # Optional description
+    is_active = Column(Boolean, default=True)  # For soft delete
+    extracted_text = Column(Text)  # Extracted text content from the file (for search/indexing)
+
+class ProjectKnowledgeBaseFile(Base):
+    __tablename__ = "project_knowledge_base_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_email = Column(String, nullable=False, index=True)  # User email who selected the file
+    mandatory_file_id = Column(Integer, ForeignKey("mandatory_files.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Ensure unique combination of user and file
+    __table_args__ = (
+        UniqueConstraint('user_email', 'mandatory_file_id', name='uq_user_file'),
+    )
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    chat_id = Column(String, index=True, nullable=False)
+    user_email = Column(String, index=True)
+    role = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(String, unique=True, index=True, nullable=False)
+    chat_id = Column(String, index=True, nullable=False)
+    user_email = Column(String, index=True)
+    project_id = Column(String, index=True, nullable=True)  # Foreign key to projects.id
+    conversation_json = Column(JSON, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+class Project(Base):
+    __tablename__ = "projects"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    user_email = Column(String, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -49,6 +49,14 @@
 .error-icon {
   font-size: 48px;
   margin-bottom: 20px;
+  color: #dc2626;
+}
+
+.loading-icon {
+  font-size: 48px;
+  margin-bottom: 20px;
+  color: #3b82f6;
+  animation: spin 2s linear infinite;
 }
 
 .error-message {

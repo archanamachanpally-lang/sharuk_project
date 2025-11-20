@@ -106,6 +106,7 @@ class GenerateRiskAssessmentRequest(BaseModel):
     additional_comments: dict
     all_risks_data: List[dict] = []  # Add the all_risks_data field
     user_email: str
+    workspace_id: Optional[int] = None  # Add workspace_id to track workspace
 
 # Feedback schemas
 class FeedbackRequest(BaseModel):

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import SprintPlan, RiskAssessment
+from models import SprintPlan, RiskAssessment, Workspace
 from typing import Dict, Any, List
 
 class DBService:
@@ -42,12 +42,15 @@ class DBService:
                 word_document=user_inputs.get('word_document'),
                 
                 # User who created this plan
-                created_by=user_email
+                created_by=user_email,
                 
-                # PDF generation is now handled by frontend html2pdf.js
-                ,
+                # Workspace for this plan - workspace_id
+                workspace_id=user_inputs.get('workspace_id'),
+                
                 # Optional SOW content
                 sow_content=user_inputs.get('sow_content')
+                
+                # PDF generation is now handled by frontend html2pdf.js
             )
             
             # Add to database
@@ -69,6 +72,13 @@ class DBService:
             plans_data = []
             for plan in plans:
                 print(f"📖 [DB SERVICE] Retrieving plan {plan.id} with word_document: {len(plan.word_document or '')} characters")
+                
+                # Fetch workspace name if workspace_id exists
+                workspace_name = None
+                if hasattr(plan, 'workspace_id') and plan.workspace_id:
+                    workspace = db.query(Workspace).filter(Workspace.id == plan.workspace_id).first()
+                    workspace_name = workspace.name if workspace else None
+                
                 plan_dict = {
                     "id": plan.id,
                     # I. Sprint Overview & Proposed Goal
@@ -101,6 +111,10 @@ class DBService:
                     
                     # User who created this plan
                     "created_by": plan.created_by,
+                    
+                    # Workspace - return both ID and name for backwards compatibility
+                    "workspace": workspace_name,
+                    "workspace_id": getattr(plan, 'workspace_id', None),
                     
                     # PDF generation is now handled by frontend html2pdf.js
                     
@@ -122,6 +136,13 @@ class DBService:
             plans_data = []
             for plan in plans:
                 print(f"📖 [DB SERVICE] Retrieving user plan {plan.id} with word_document: {len(plan.word_document or '')} characters")
+                
+                # Fetch workspace name if workspace_id exists
+                workspace_name = None
+                if hasattr(plan, 'workspace_id') and plan.workspace_id:
+                    workspace = db.query(Workspace).filter(Workspace.id == plan.workspace_id).first()
+                    workspace_name = workspace.name if workspace else None
+                
                 plan_dict = {
                     "id": plan.id,
                     # I. Sprint Overview & Proposed Goal
@@ -154,6 +175,10 @@ class DBService:
                     
                     # User who created this plan
                     "created_by": plan.created_by,
+                    
+                    # Workspace - return both ID and name for backwards compatibility
+                    "workspace": workspace_name,
+                    "workspace_id": getattr(plan, 'workspace_id', None),
                     
                     # PDF generation is now handled by frontend html2pdf.js
                     
@@ -172,6 +197,12 @@ class DBService:
             plan = db.query(SprintPlan).filter(SprintPlan.id == plan_id).first()
             
             if plan:
+                # Fetch workspace name if workspace_id exists
+                workspace_name = None
+                if hasattr(plan, 'workspace_id') and plan.workspace_id:
+                    workspace = db.query(Workspace).filter(Workspace.id == plan.workspace_id).first()
+                    workspace_name = workspace.name if workspace else None
+                
                 plan_dict = {
                     "id": plan.id,
                     # I. Sprint Overview & Proposed Goal
@@ -204,6 +235,10 @@ class DBService:
                     
                     # User who created this plan
                     "created_by": plan.created_by,
+                    
+                    # Workspace - return both ID and name for backwards compatibility
+                    "workspace": workspace_name,
+                    "workspace_id": getattr(plan, 'workspace_id', None),
                     
                     # PDF generation is now handled by frontend html2pdf.js
                     
@@ -294,7 +329,10 @@ class DBService:
                 word_document=user_inputs.get('word_document'),
                 
                 # User who created this assessment
-                created_by=user_email
+                created_by=user_email,
+                
+                # Workspace for this assessment - workspace_id
+                workspace_id=user_inputs.get('workspace_id')
             )
             
             # Add to database
@@ -315,6 +353,12 @@ class DBService:
             # Convert to dictionary format
             assessments_data = []
             for assessment in assessments:
+                # Fetch workspace name if workspace_id exists
+                workspace_name = None
+                if hasattr(assessment, 'workspace_id') and assessment.workspace_id:
+                    workspace = db.query(Workspace).filter(Workspace.id == assessment.workspace_id).first()
+                    workspace_name = workspace.name if workspace else None
+                
                 assessment_dict = {
                     "id": assessment.id,
                     "project_name": assessment.project_name,
@@ -331,6 +375,8 @@ class DBService:
                     "generated_assessment": assessment.generated_assessment,
                     "word_document": assessment.word_document,
                     "created_by": assessment.created_by,
+                    "workspace": workspace_name,
+                    "workspace_id": getattr(assessment, 'workspace_id', None),
                     "created_at": assessment.created_at.isoformat() if assessment.created_at else None
                 }
                 assessments_data.append(assessment_dict)
@@ -349,6 +395,12 @@ class DBService:
             # Convert to dictionary format
             assessments_data = []
             for assessment in assessments:
+                # Fetch workspace name if workspace_id exists
+                workspace_name = None
+                if hasattr(assessment, 'workspace_id') and assessment.workspace_id:
+                    workspace = db.query(Workspace).filter(Workspace.id == assessment.workspace_id).first()
+                    workspace_name = workspace.name if workspace else None
+                
                 assessment_dict = {
                     "id": assessment.id,
                     "project_name": assessment.project_name,
@@ -365,6 +417,8 @@ class DBService:
                     "generated_assessment": assessment.generated_assessment,
                     "word_document": assessment.word_document,
                     "created_by": assessment.created_by,
+                    "workspace": workspace_name,
+                    "workspace_id": getattr(assessment, 'workspace_id', None),
                     "created_at": assessment.created_at.isoformat() if assessment.created_at else None
                 }
                 assessments_data.append(assessment_dict)
@@ -380,6 +434,12 @@ class DBService:
             
             if not assessment:
                 return {"success": False, "message": "Risk assessment not found"}
+            
+            # Fetch workspace name if workspace_id exists
+            workspace_name = None
+            if hasattr(assessment, 'workspace_id') and assessment.workspace_id:
+                workspace = db.query(Workspace).filter(Workspace.id == assessment.workspace_id).first()
+                workspace_name = workspace.name if workspace else None
             
             assessment_dict = {
                 "id": assessment.id,
@@ -397,6 +457,8 @@ class DBService:
                 "generated_assessment": assessment.generated_assessment,
                 "word_document": assessment.word_document,
                 "created_by": assessment.created_by,
+                "workspace": workspace_name,
+                "workspace_id": getattr(assessment, 'workspace_id', None),
                 "created_at": assessment.created_at.isoformat() if assessment.created_at else None
             }
             

@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import './SprintResultsPage.css';
 
 const SprintResultsPage = () => {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
+  // eslint-disable-next-line no-unused-vars
+  void user;
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -74,27 +77,180 @@ const SprintResultsPage = () => {
   const [showValidationResult, setShowValidationResult] = useState(false);
   const [validationResult, setValidationResult] = useState('');
 
+  // State for version tracking
+  const [showVersionModal, setShowVersionModal] = useState(false);
+  const [planVersions, setPlanVersions] = useState([]);
+  const [currentVersionNumber, setCurrentVersionNumber] = useState(1);
+
+  // State for share functionality
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareDescription, setShareDescription] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [showSentMessage, setShowSentMessage] = useState(false);
+
   // Debug loading state changes
   useEffect(() => {
     console.log('🔄 isCommentProcessing state changed:', isCommentProcessing);
   }, [isCommentProcessing]);
+
+  // Handle email sharing
+  const handleSendEmail = async () => {
+    if (!shareEmail || !shareEmail.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
+    // Close the modal first to show loading animation
+    setShowShareModal(false);
+    
+    // Small delay to ensure modal closes
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    setSendingEmail(true);
+    try {
+      // Get the sprint plan name (from originalData or use a default)
+      const sprintPlanName = originalData?.sprint_number || 'Sprint Plan';
+      
+      // Create subject with format: "sprint plan shared : {sprint_plan_name}"
+      const subject = `sprint plan shared : ${sprintPlanName}`;
+      
+      // Prepare email data
+      const emailData = {
+        to: shareEmail,
+        subject: subject,
+        body: shareDescription || 'Please find the sprint plan below.',
+        sprintPlanContent: generatedPlan,
+        sprintPlanName: sprintPlanName
+      };
+
+      // Get email content from backend
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/send-sprint-plan-email`, emailData);
+
+      if (response.data.success) {
+        // Close the modal first
+        setShowShareModal(false);
+        setShareEmail('');
+        setShareDescription('');
+        
+        // Small delay to ensure modal closes, then show sent message
+        setTimeout(() => {
+          setShowSentMessage(true);
+          
+          // Auto hide after 3 seconds
+          setTimeout(() => {
+            setShowSentMessage(false);
+          }, 3000);
+        }, 100);
+      } else {
+        setSendingEmail(false); // Stop loading if failed
+        alert(`❌ ${response.data.message || 'Failed to send email'}`);
+      }
+    } catch (error) {
+      console.error('Error generating email:', error);
+      alert('Failed to generate email. Please try again.');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
   
   // State for SOW file upload
+  // eslint-disable-next-line no-unused-vars
   const [selectedSowFile, setSelectedSowFile] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [sowFileName, setSowFileName] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [sowFileContent, setSowFileContent] = useState('');
+  // eslint-disable-next-line no-unused-vars
   const [isReadingFile, setIsReadingFile] = useState(false);
   
   // Extract the generated plan and user inputs from the sprint plan response
   const generatedPlan = sprintPlan?.response || sprintPlan?.summary || sprintPlan?.word_document;
   const userInputs = originalData;
   
-  // Load the generated plan when component mounts
+  // Load the generated plan when component mounts - only once
   React.useEffect(() => {
-    if (generatedPlan) {
+    if (generatedPlan && planVersions.length === 0) {
       setCurrentGeneratedPlan(generatedPlan);
+      // Initialize version tracking with the first version
+      initializeVersionTracking(generatedPlan);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generatedPlan]);
+
+  // Initialize version tracking with the first version
+  const initializeVersionTracking = (initialPlan) => {
+    // Create a deep copy of the initial plan content
+    // CRITICAL: Force create a NEW string copy to prevent reference sharing
+    let initialContent;
+    if (typeof initialPlan === 'string') {
+      initialContent = String(initialPlan).slice();
+    } else {
+      initialContent = JSON.parse(JSON.stringify(initialPlan));
+    }
+    
+    // Verify it's a proper copy
+    console.log('📚 [VERSION] Original plan length:', initialPlan?.length || 0);
+    console.log('📚 [VERSION] Initial content length:', initialContent?.length || 0);
+    console.log('📚 [VERSION] Same reference?', initialPlan === initialContent);
+    
+    const initialVersion = {
+      versionNumber: 1,
+      content: initialContent,
+      timestamp: new Date().toLocaleString(),
+      action: 'Initial Generation',
+      description: 'Sprint plan generated successfully'
+    };
+    setPlanVersions([initialVersion]);
+    setCurrentVersionNumber(1);
+    console.log('📚 [VERSION] Initialized version tracking with version 1');
+    console.log('📚 [VERSION] Stored content length:', initialContent?.length || 0);
+  };
+
+  // Add new version to tracking
+  const addNewVersion = (content, action, description) => {
+    setPlanVersions(prev => {
+      const newVersionNumber = prev.length > 0 ? prev[prev.length - 1].versionNumber + 1 : currentVersionNumber + 1;
+      
+      // Create a deep copy of the content to avoid reference issues
+      // CRITICAL: Always create a NEW string copy to prevent reference sharing
+      let contentCopy;
+      if (typeof content === 'string') {
+        // Force create a new string via String() and slice()
+        contentCopy = String(content).slice();
+      } else {
+        contentCopy = JSON.parse(JSON.stringify(content));
+      }
+      
+      // Double-check we have a proper copy (not a reference)
+      console.log(`📚 [VERSION] Original content length: ${content?.length || 0}`);
+      console.log(`📚 [VERSION] Copy content length: ${contentCopy?.length || 0}`);
+      console.log(`📚 [VERSION] Same reference? ${content === contentCopy}`);
+      
+      const newVersion = {
+        versionNumber: newVersionNumber,
+        content: contentCopy,
+        timestamp: new Date().toLocaleString(),
+        action: action,
+        description: description
+      };
+      
+      // Create a new array with a new object, don't mutate
+      const updatedVersions = [...prev, newVersion];
+      setCurrentVersionNumber(newVersionNumber);
+      
+      console.log(`📚 [VERSION] Added version ${newVersionNumber}: ${action} - ${description}`);
+      console.log(`📚 [VERSION] Total versions: ${updatedVersions.length}`);
+      console.log(`📚 [VERSION] Stored content length: ${contentCopy?.length || 0}`);
+      
+      return updatedVersions;
+    });
+  };
+
+  // Handle version modal
+  const handleVersionModal = () => {
+    setShowVersionModal(true);
+  };
   
   // Create header mappings when entering comments mode
   React.useEffect(() => {
@@ -112,7 +268,7 @@ const SprintResultsPage = () => {
       delete window.handleAddComment;
       delete window.handleSaveComment;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Authentication check
   React.useEffect(() => {
@@ -245,7 +401,7 @@ const SprintResultsPage = () => {
       });
 
       // Call backend validation endpoint
-      const response = await fetch('/api/sprint/validate-plan', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sprint/validate-plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -359,7 +515,7 @@ const SprintResultsPage = () => {
       });
 
       // Call the backend to regenerate the plan
-      const response = await fetch('/api/sprint/generate-plan', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sprint/generate-plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -381,7 +537,11 @@ const SprintResultsPage = () => {
         console.log('✅ Plan regenerated successfully with current plan and latest SOW!');
         
         // Update the current plan with the new generated content
-        setCurrentGeneratedPlan(result.response || result.summary || result.word_document);
+        const regeneratedContent = result.response || result.summary || result.word_document;
+        setCurrentGeneratedPlan(regeneratedContent);
+        
+        // Add new version for the regeneration
+        addNewVersion(regeneratedContent, 'SOW Regeneration', 'Plan regenerated with updated SOW content');
         
         // Close the modal
         setShowSowModal(false);
@@ -428,7 +588,7 @@ const SprintResultsPage = () => {
       console.log('💾 SOW Content length:', sowContent.length);
 
       // Call backend API to update SOW content
-      const response = await fetch('/api/sprint/update-sow', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sprint/update-sow`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -506,7 +666,7 @@ const SprintResultsPage = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch('/api/upload/sow', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/upload/sow`, {
         method: 'POST',
         body: formData,
       });
@@ -556,7 +716,7 @@ const SprintResultsPage = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch('/api/upload/sow', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/upload/sow`, {
         method: 'POST',
         body: formData,
       });
@@ -786,10 +946,35 @@ Please update the HTML content according to the instructions above. Return only 
         
         // Overwrite the existing generated_plan with new HTML
         const updatedHtml = response.response;
-        setCurrentGeneratedPlan(updatedHtml);
+        
+        // Check if content actually changed
+        const hasChanged = currentGeneratedPlan !== updatedHtml;
+        console.log('💾 [LLM] Content changed:', hasChanged);
+        console.log('💾 [LLM] Current plan length:', currentGeneratedPlan?.length || 0);
+        console.log('💾 [LLM] Updated HTML length:', updatedHtml?.length || 0);
+        console.log('💾 [LLM] Content is same object?', currentGeneratedPlan === updatedHtml);
+        
+        // Create a DEEP copy to avoid reference issues with stored versions
+        // IMPORTANT: Always create a fresh string copy, never reuse references
+        const htmlCopy = String(updatedHtml).slice(); // Ensure it's a string and create new copy
+        
+        // Verify it's a different reference
+        console.log('💾 [LLM] HTML copy is same as original?', htmlCopy === updatedHtml);
+        console.log('💾 [LLM] HTML copy length:', htmlCopy?.length || 0);
+        
+        // Update the current generated plan with the copied content
+        setCurrentGeneratedPlan(htmlCopy);
         
         // Also update the updatedPlanWithComments for consistency
-        setUpdatedPlanWithComments(updatedHtml);
+        setUpdatedPlanWithComments(htmlCopy);
+        
+        // Only add new version if content actually changed
+        if (hasChanged) {
+          // Pass the copy to addNewVersion to ensure it stores an independent copy
+          addNewVersion(htmlCopy, 'AI Comment Edit', `Plan updated based on comment: "${comment.trim()}"`);
+        } else {
+          console.log('💾 [LLM] No changes detected, skipping version creation');
+        }
         
         console.log('💾 [LLM] Generated plan updated with new HTML content');
         
@@ -861,8 +1046,31 @@ Please update the HTML content according to the instructions above. Return only 
       console.log('💾 [SAVE PLAN] Original edited plan:', updatedPlan.substring(0, 200));
       console.log('💾 [SAVE PLAN] Final cleaned plan:', cleanedPlan.substring(0, 200));
       
-      // Update the current generated plan with the cleaned content
-      setCurrentGeneratedPlan(cleanedPlan);
+      // Check if content actually changed
+      const hasChanged = currentGeneratedPlan !== cleanedPlan;
+      console.log('💾 [SAVE PLAN] Content changed:', hasChanged);
+      console.log('💾 [SAVE PLAN] Current plan length:', currentGeneratedPlan?.length || 0);
+      console.log('💾 [SAVE PLAN] Cleaned plan length:', cleanedPlan?.length || 0);
+      console.log('💾 [SAVE PLAN] Content is same object?', currentGeneratedPlan === cleanedPlan);
+      
+      // Create a DEEP copy to avoid reference issues with stored versions
+      // IMPORTANT: Always create a fresh string copy, never reuse references
+      const planCopy = String(cleanedPlan).slice(); // Ensure it's a string and create new copy
+      
+      // Verify it's a different reference
+      console.log('💾 [SAVE PLAN] Plan copy is same as original?', planCopy === cleanedPlan);
+      console.log('💾 [SAVE PLAN] Plan copy length:', planCopy?.length || 0);
+      
+      // Update the current generated plan with the copied content
+      setCurrentGeneratedPlan(planCopy);
+      
+      // Only add new version if content actually changed
+      if (hasChanged) {
+        // Pass the copy to addNewVersion to ensure it stores an independent copy
+        addNewVersion(planCopy, 'Manual Edit', 'Plan edited manually by user');
+      } else {
+        console.log('💾 [SAVE PLAN] No changes detected, skipping version creation');
+      }
       
       // Here you would typically save to backend
       // For now, we'll just update the local state
@@ -1036,6 +1244,7 @@ Please update the HTML content according to the instructions above. Return only 
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const generatePDFContent = () => {
     console.log('📄 Generating PDF content for Sprint Results');
     console.log('📄 User inputs in generatePDFContent:', userInputs);
@@ -1382,23 +1591,32 @@ Please update the HTML content according to the instructions above. Return only 
         formattedContent += `<h1 style="color: #1f2937; font-size: 24px; font-weight: bold; margin: 20px 0 15px 0; text-align: center;">${line}</h1>`;
       }
       // Check for numbered sections (e.g., "1. Testing new doc Scope Adherence")
+      // eslint-disable-next-line no-useless-escape
       else if (line.match(/^\d+\.\s+.+/)) {
         if (inBulletList) {
           formattedContent += '</ul>';
           inBulletList = false;
         }
         const sectionText = line.replace(/^\d+\.\s+/, '');
+        // eslint-disable-next-line no-unused-vars
+        void sectionText;
         formattedContent += `<h2 style="color: #1f2937; font-size: 18px; font-weight: bold; margin: 20px 0 10px 0;">${line}</h2>`;
       }
       // Check for bullet points (lines starting with • or - or * or indented)
+      // eslint-disable-next-line no-useless-escape
       else if (line.match(/^[•\-\*]\s+/) || line.startsWith('  ') || line.startsWith('\t')) {
         if (!inBulletList) {
           formattedContent += '<ul style="margin: 10px 0; padding-left: 20px;">';
           inBulletList = true;
         }
+        // eslint-disable-next-line no-useless-escape
         const bulletText = line.replace(/^[•\-\*]\s+/, '').replace(/^\s+/, '');
+        // eslint-disable-next-line no-useless-escape
         // Check for bold text within bullet points (like "80%")
+        // eslint-disable-next-line no-useless-escape
         const formattedBulletText = bulletText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // eslint-disable-next-line no-unused-vars
+        void formattedBulletText;
         formattedContent += `<li style="color: #1f2937; margin: 5px 0; line-height: 1.5;">${formattedBulletText}</li>`;
       }
       // Regular paragraphs
@@ -1452,6 +1670,7 @@ Please update the HTML content according to the instructions above. Return only 
   };
 
   // Simple function to place cursor at the end of content (only when explicitly needed)
+  // eslint-disable-next-line no-unused-vars
   const placeCursorAtEnd = () => {
     if (contentEditableRef.current) {
       try {
@@ -1476,6 +1695,7 @@ Please update the HTML content according to the instructions above. Return only 
   };
 
   // Simple function to get current cursor position
+  // eslint-disable-next-line no-unused-vars
   const getCurrentCursorPosition = () => {
     if (contentEditableRef.current) {
       try {
@@ -1495,6 +1715,7 @@ Please update the HTML content according to the instructions above. Return only 
   };
 
   // Simple function to set cursor position
+  // eslint-disable-next-line no-unused-vars
   const setCursorPosition = (offset, container) => {
     if (contentEditableRef.current && offset !== null) {
       try {
@@ -1525,7 +1746,7 @@ Please update the HTML content according to the instructions above. Return only 
     try {
       console.log('🤖 [LLM] Starting Gemini LLM service call...');
       console.log('🤖 [LLM] Prompt preview:', prompt.substring(0, 200) + '...');
-      const response = await fetch('/api/gemini/chat', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/gemini/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -1613,33 +1834,41 @@ Please update the HTML content according to the instructions above. Return only 
           <h1>Sprint Plan Generated Successfully!</h1>
           <p>Your comprehensive sprint plan has been generated and saved to the database.</p>
         </div>
-        <button className="feedback-btn" onClick={() => navigate('/feedback', { 
-          state: {
-            sprintPlan: sprintPlan,
-            originalData: originalData,
-            sowData: sowData
-          }
-        })}>
-          FEEDBACK
-        </button>
+        <div className="header-actions">
+          <button className="feedback-btn" onClick={() => navigate('/feedback', { 
+            state: {
+              sprintPlan: sprintPlan,
+              originalData: originalData,
+              sowData: sowData
+            }
+          })}>
+            FEEDBACK
+          </button>
+          <button className="share-btn" onClick={() => setShowShareModal(true)}>
+            SHARE
+          </button>
+        </div>
       </div>
 
 
 
              <div className="results-content">
          <div className="plan-section">
-           <div className="plan-header">
-             <h2>Generated Sprint Plan</h2>
+           <div className="plan-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+             <h2 style={{ margin: 0 }}>Generated Sprint Plan</h2>
              {!isEditing && (
-               <div style={{ display: 'flex', gap: '1px' }}>
-                 <button className="btn btn-info btn-sm" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleCommentsMode}>
+               <div style={{ display: 'flex', gap: '2px' }}>
+                 <button className="btn btn-info btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={handleCommentsMode}>
                    💬 Comments
                  </button>
-                 <button className="btn btn-warning btn-sm edit-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleEditPlan}>
+                 <button className="btn btn-warning btn-sm edit-btn" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={handleEditPlan}>
                    ✏️ Edit
                  </button>
-                 <button className="btn btn-secondary btn-sm" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => setShowSowModal(true)}>
+                 <button className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => setShowSowModal(true)}>
                   SOW Doc
+                 </button>
+                 <button className="btn btn-primary btn-sm" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={handleVersionModal}>
+                   📚 Version {currentVersionNumber}
                  </button>
                </div>
              )}
@@ -2181,6 +2410,283 @@ Please update the HTML content according to the instructions above. Return only 
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Version History Modal */}
+      {showVersionModal && (
+        <div className="loading-overlay" onClick={() => setShowVersionModal(false)}>
+          <div className="version-modal" onClick={(e) => e.stopPropagation()} style={{ 
+            maxWidth: '1200px', 
+            width: '95%', 
+            background: '#fff', 
+            borderRadius: '12px', 
+            padding: '20px', 
+            border: '1px solid #e5e7eb',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.1)'
+          }}>
+            {/* Header */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '20px',
+              paddingBottom: '15px',
+              borderBottom: '2px solid #e5e7eb'
+            }}>
+              <h2 style={{ margin: 0, color: '#1f2937', fontSize: '24px', fontWeight: '600' }}>
+                📚 Version History
+              </h2>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowVersionModal(false)}
+                style={{ padding: '8px 16px', fontSize: '14px' }}
+              >
+                ✕ Close
+              </button>
+            </div>
+            
+            {/* Version List */}
+            <div style={{ 
+              flex: 1,
+              overflow: 'auto',
+              padding: '10px 0'
+            }}>
+              {planVersions.length === 0 ? (
+                <div style={{ 
+                  textAlign: 'center', 
+                  padding: '40px', 
+                  color: '#6b7280' 
+                }}>
+                  <p>No versions available yet.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  {planVersions.map((version, index) => (
+                    <div 
+                      key={version.versionNumber}
+                      style={{
+                        border: version.versionNumber === currentVersionNumber ? '2px solid #3182ce' : '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        padding: '15px',
+                        background: version.versionNumber === currentVersionNumber ? '#f0f9ff' : '#fff',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={() => {
+                        // Create a copy of the version content to avoid reference issues
+                        const restoredContent = typeof version.content === 'string' ? version.content.slice() : JSON.parse(JSON.stringify(version.content));
+                        setCurrentGeneratedPlan(restoredContent);
+                        setCurrentVersionNumber(version.versionNumber);
+                        setShowVersionModal(false);
+                        
+                        console.log(`📚 [VERSION] Restored version ${version.versionNumber}`);
+                        console.log(`📚 [VERSION] Restored content length: ${restoredContent?.length || 0}`);
+                      }}
+                    >
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        marginBottom: '8px'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ 
+                            fontWeight: '600', 
+                            fontSize: '16px',
+                            color: version.versionNumber === currentVersionNumber ? '#3182ce' : '#1f2937'
+                          }}>
+                            Version {version.versionNumber}
+                            {version.versionNumber === currentVersionNumber && ' (Current)'}
+                          </span>
+                          <span style={{ 
+                            fontSize: '12px', 
+                            color: '#6b7280',
+                            background: '#f3f4f6',
+                            padding: '2px 8px',
+                            borderRadius: '4px'
+                          }}>
+                            {version.action}
+                          </span>
+                        </div>
+                        <span style={{ 
+                          fontSize: '12px', 
+                          color: '#6b7280' 
+                        }}>
+                          {version.timestamp}
+                        </span>
+                      </div>
+                      
+                      <p style={{ 
+                        margin: '0', 
+                        fontSize: '14px', 
+                        color: '#4b5563',
+                        lineHeight: '1.4'
+                      }}>
+                        {version.description}
+                      </p>
+                      
+                      {/* Preview of content */}
+                      <div style={{ 
+                        marginTop: '10px',
+                        padding: '8px',
+                        background: '#f9fafb',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        color: '#6b7280',
+                        maxHeight: '60px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {version.content.substring(0, 200)}...
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div style={{ 
+              marginTop: '20px',
+              paddingTop: '15px',
+              borderTop: '1px solid #e5e7eb',
+              textAlign: 'center',
+              color: '#6b7280',
+              fontSize: '14px'
+            }}>
+              <p style={{ margin: '0' }}>
+                Click on any version to restore it as the current plan
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="share-modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="share-modal-header">
+              <h3>Share Sprint Plan via Email</h3>
+              <button className="close-btn" onClick={() => setShowShareModal(false)}>×</button>
+            </div>
+            
+            <div className="share-modal-content">
+              <div className="form-group">
+                <p style={{marginBottom: '15px', color: '#6b7280', fontSize: '0.9rem'}}>
+                  📧 This will send an email with your description as the message body and the sprint plan as a PDF attachment.
+                </p>
+              </div>
+              <div className="form-group">
+                <label htmlFor="shareEmail">Recipient Email *</label>
+                <input
+                  type="email"
+                  id="shareEmail"
+                  value={shareEmail}
+                  onChange={(e) => setShareEmail(e.target.value)}
+                  placeholder="Enter recipient email address"
+                  required
+                  disabled={sendingEmail}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="shareDescription">Description</label>
+                <textarea
+                  id="shareDescription"
+                  value={shareDescription}
+                  onChange={(e) => setShareDescription(e.target.value)}
+                  placeholder="Enter description for the email body"
+                  rows={4}
+                  disabled={sendingEmail}
+                />
+              </div>
+            </div>
+            
+            <div className="share-modal-actions">
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowShareModal(false)}
+                disabled={sendingEmail}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleSendEmail}
+                disabled={!shareEmail || sendingEmail}
+              >
+                {sendingEmail ? 'Sending...' : 'Send Email'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Animation while sending */}
+      {sendingEmail && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '40px',
+            borderRadius: '12px',
+            textAlign: 'center',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+          }}>
+            <div className="loading-ring-large"></div>
+            <h3 style={{ marginTop: '20px', color: '#1f2937', fontSize: '18px', fontWeight: '600' }}>
+              Sending Email...
+            </h3>
+          </div>
+        </div>
+      )}
+
+      {/* Sent Message Success Overlay */}
+      {showSentMessage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '40px 60px',
+            borderRadius: '12px',
+            textAlign: 'center',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            animation: 'fadeIn 0.3s ease-in'
+          }}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>✅</div>
+            <h2 style={{ margin: 0, color: '#10b981', fontSize: '24px', fontWeight: '700' }}>
+              Sent!
+            </h2>
+            <p style={{ margin: '10px 0 0 0', color: '#6b7280', fontSize: '16px' }}>
+              Sprint plan sent successfully
+            </p>
           </div>
         </div>
       )}

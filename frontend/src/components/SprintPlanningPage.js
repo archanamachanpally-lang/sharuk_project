@@ -368,9 +368,10 @@ const SprintPlanningPage = () => {
       // No saved data, start with overview tab
       setActiveTab('overview');
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Function to populate form with Excel data
+  // eslint-disable-next-line no-unused-vars
   const populateFormWithExcelData = (excelData) => {
     console.log('Excel data received in populateFormWithExcelData:', excelData);
     console.log('Excel data structure:', JSON.stringify(excelData, null, 2));
@@ -897,6 +898,9 @@ const SprintPlanningPage = () => {
     }, 800); // Move to next stage every 800ms
     
     try {
+      // Get the current workspace from localStorage
+      const selectedWorkspace = JSON.parse(localStorage.getItem('selectedWorkspace') || '{}');
+      
       const requestData = {
         sprint_overview: answers.SprintOverview,
         team_capacity: answers.TeamCapacity,
@@ -905,12 +909,13 @@ const SprintPlanningPage = () => {
         risks_and_impediments: answers.RisksAndImpediments,
         additional_comments: answers.AdditionalComments,
         sow_content: (sessionStorage.getItem('sowContentHtml') || sessionStorage.getItem('sowContentRaw')) || null,
-        user_email: userEmail
+        user_email: userEmail,
+        workspace_id: selectedWorkspace?.id || null
       };
 
       // console.log('Sending data to backend:', JSON.stringify(requestData, null, 2));
 
-      const response = await fetch('/api/sprint/generate-plan', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sprint/generate-plan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

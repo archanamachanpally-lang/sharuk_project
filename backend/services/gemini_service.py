@@ -5,18 +5,118 @@ from typing import List, Dict, Any
 
 class GeminiService:
     def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
-            raise ValueError("GEMINI_API_KEY environment variable is required. Please set it in your .env file.")
+        # Initialize API keys with fallback support
+        self.api_keys = [
+            os.getenv("GEMINI_API_KEY_1"),      # Primary API key
+            os.getenv("GEMINI_API_KEY_2"),      # Secondary API key  
+            os.getenv("GEMINI_API_KEY_3")       # Tertiary API key
+        ]
+        
+        # Add legacy support for GEMINI_API_KEY if no numbered keys are set
+        legacy_key = os.getenv("GEMINI_API_KEY")
+        if legacy_key and not any(self.api_keys):
+            self.api_keys = [legacy_key]
+            print("🔑 [GEMINI SERVICE] Using legacy GEMINI_API_KEY")
+        
+        # Filter out None values and ensure we have at least one key
+        self.api_keys = [key for key in self.api_keys if key]
+        
+        if not self.api_keys:
+            raise ValueError("At least one GEMINI_API_KEY environment variable is required. Please set GEMINI_API_KEY_1, GEMINI_API_KEY_2, or GEMINI_API_KEY_3 in your .env file.")
+        
+        # Track current API key index and usage
+        self.current_key_index = 0
+        self.current_api_key = self.api_keys[0]
         self.model = "gemini-2.0-flash"
         self.base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
         
+        print(f"🔑 [GEMINI SERVICE] Initialized with {len(self.api_keys)} API key(s)")
+        print(f"🔑 [GEMINI SERVICE] Using API key #{self.current_key_index + 1}")
+        
+    def _switch_to_next_api_key(self):
+        """Switch to the next available API key"""
+        if self.current_key_index < len(self.api_keys) - 1:
+            self.current_key_index += 1
+            self.current_api_key = self.api_keys[self.current_key_index]
+            print(f"🔄 [GEMINI SERVICE] Switched to API key #{self.current_key_index + 1}")
+            return True
+        else:
+            print(f"❌ [GEMINI SERVICE] All API keys exhausted. No more fallback options.")
+            return False
+    
+    def _is_rate_limit_error(self, response):
+        """Check if the response indicates a rate limit error"""
+        if response.status_code == 429:  # Too Many Requests
+            return True
+        
+        try:
+            error_data = response.json()
+            error_message = error_data.get('error', {}).get('message', '').lower()
+            # Check for common rate limit indicators
+            rate_limit_indicators = [
+                'quota exceeded',
+                'rate limit',
+                'too many requests',
+                'quota has been exceeded',
+                'daily limit exceeded',
+                'monthly limit exceeded',
+                'billing limit exceeded'
+            ]
+            return any(indicator in error_message for indicator in rate_limit_indicators)
+        except:
+            return False
+    
+    def _make_api_request(self, headers, data):
+        """Make API request with automatic fallback on rate limits"""
+        max_retries = len(self.api_keys)
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"🌐 [GEMINI SERVICE] Making request with API key #{self.current_key_index + 1} (attempt {attempt + 1})")
+                
+                response = requests.post(self.base_url, headers=headers, json=data)
+                
+                # Check if request was successful
+                if response.status_code == 200:
+                    print(f"✅ [GEMINI SERVICE] Request successful with API key #{self.current_key_index + 1}")
+                    return response, None
+                
+                # Check if it's a rate limit error
+                if self._is_rate_limit_error(response):
+                    print(f"⚠️ [GEMINI SERVICE] Rate limit hit with API key #{self.current_key_index + 1}")
+                    
+                    # Try to switch to next API key
+                    if self._switch_to_next_api_key():
+                        # Update headers with new API key
+                        headers["X-goog-api-key"] = self.current_api_key
+                        continue
+                    else:
+                        # No more API keys available
+                        error_msg = f"All API keys have reached their limits. Last error: {response.text}"
+                        return None, error_msg
+                else:
+                    # Non-rate-limit error
+                    error_msg = f"API error (status {response.status_code}): {response.text}"
+                    return None, error_msg
+                    
+            except requests.exceptions.RequestException as e:
+                print(f"❌ [GEMINI SERVICE] Request exception with API key #{self.current_key_index + 1}: {str(e)}")
+                
+                # Try to switch to next API key for network issues
+                if self._switch_to_next_api_key():
+                    headers["X-goog-api-key"] = self.current_api_key
+                    continue
+                else:
+                    return None, f"Network error: {str(e)}"
+        
+        return None, "Maximum retry attempts exceeded"
+        
     def chat(self, messages: List[Dict[str, str]], max_tokens: int = 3000) -> Dict[str, Any]:
-        """Send messages to Gemini API and get response"""
+        """Send messages to Gemini API and get response with fallback support"""
         try:
             headers = {
                 "Content-Type": "application/json",
-                "X-goog-api-key": self.api_key
+                "X-goog-api-key": self.current_api_key
             }
             
             # Convert OpenAI format messages to Gemini format
@@ -48,11 +148,15 @@ class GeminiService:
                 "contents": contents
             }
             
+            # Make API request with fallback support
+            response, error = self._make_api_request(headers, data)
             
-            response = requests.post(self.base_url, headers=headers, json=data)
-            
-            if response.status_code != 200:
-                response.raise_for_status()
+            if error:
+                return {
+                    "success": False,
+                    "response": f"Gemini API error: {error}",
+                    "error": error
+                }
             
             result = response.json()
             
@@ -75,15 +179,10 @@ class GeminiService:
             return {
                 "success": True,
                 "response": content,
-                "usage": result.get("usage", {})
+                "usage": result.get("usage", {}),
+                "api_key_used": f"#{self.current_key_index + 1}"
             }
             
-        except requests.exceptions.RequestException as e:
-            return {
-                "success": False,
-                "response": f"Gemini API error: {str(e)}",
-                "error": str(e)
-            }
         except Exception as e:
             return {
                 "success": False,
@@ -197,7 +296,7 @@ CRITICAL VALIDATION REQUIREMENTS:
    - Risk Management Plan
    - Key Collaboration Points & Handoffs
    - Sprint Confidence
-
+   - Sprint Confidence Improvement Recommendations
 VALIDATION INSTRUCTIONS:
 - First, check if "Detailed Task Breakdown" section exists in the plan
 - If "Detailed Task Breakdown" section is MISSING, the plan is INCOMPLETE
@@ -289,8 +388,9 @@ GENERATED RISK ASSESSMENT TO VALIDATE:
 
 CRITICAL VALIDATION REQUIREMENTS:
 1. **Risk Count Verification**: The user provided {expected_risk_count} risks in their input
-2. **Risk Register Only**: Generate ONLY a Risk Register with ALL {expected_risk_count} risks
-3. **Output Format Compliance**: Each risk MUST follow the exact HTML format:
+2. **Risk Register**: Generate a Risk Register with ALL {expected_risk_count} risks
+3. **Risk Confidence Section**: After the Risk Register, include a Risk Confidence section
+4. **Output Format Compliance**: Each risk MUST follow the exact HTML format:
    <div class="risk-section">
    <h3>Risk ID: [Issue Key]</h3>
    <p><strong>Risk Description:</strong> [Synthesized Description]</p>
@@ -313,8 +413,23 @@ VALIDATION INSTRUCTIONS:
 - Focus only on the 8 specified fields for each risk
 - Do NOT include any validation messages or status indicators
 
+RISK CONFIDENCE SECTION REQUIREMENTS:
+After the Risk Register, include a "Risk Confidence" section with the following format:
+   <div class="risk-confidence-section">
+   <h2>Risk Confidence</h2>
+   <p><strong>Confidence Score:</strong> [Score out of 10 or percentage] for achieving the Sprint Goal</p>
+   <p><strong>Rationale:</strong> [Brief explanation of the confidence score, considering the plan, identified risks, severity of risks, mitigation strategies, and team capacity]</p>
+   </div>
+
+The confidence score should:
+- Be based on the analysis of all identified risks
+- Consider risk severity and mitigation plans
+- Take into account team capacity and project scope
+- Provide actionable insights for stakeholders
+
 RESPONSE FORMAT:
-- Return ONLY the Risk Register with proper HTML formatting
+- Return the Risk Register followed by the Risk Confidence section
+- Use proper HTML formatting with appropriate div classes
 - Do NOT include any validation messages like "✅ VALIDATION PASSED" or "🔄 ASSESSMENT REGENERATED"
 - Always maintain clean HTML structure with proper sections
 
@@ -326,7 +441,7 @@ Please validate this risk assessment and ensure ALL {expected_risk_count} risks 
             # Call Gemini with validation prompt
             messages = [
                 {"role": "system", "content": validation_prompt},
-                {"role": "user", "content": f"Please validate and improve this risk assessment to ensure all {expected_risk_count} risks are included with proper formatting."}
+                {"role": "user", "content": f"Please validate and improve this risk assessment to ensure all {expected_risk_count} risks are included with proper formatting. Also include a Risk Confidence section at the end with a confidence score and rationale."}
             ]
             
             print("🔍 [RISK VALIDATION] Calling Gemini service for validation...")

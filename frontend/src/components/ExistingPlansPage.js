@@ -27,13 +27,47 @@ const ExistingPlansPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredPlans, setFilteredPlans] = useState([]);
   
+  // Workspace filter state
+  const [workspaces, setWorkspaces] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState('Created by Me');
+  
   // Get user email once at component level
   const userEmail = user ? user.email : 'demo@example.com';
   
+  // Fetch workspaces
+  useEffect(() => {
+    const fetchWorkspaces = async () => {
+      try {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/api/workspaces`);
+        const data = await response.json();
+        if (data.success) {
+          setWorkspaces(data.workspaces || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch workspaces:', err);
+      }
+    };
+    fetchWorkspaces();
+  }, []);
+
   const fetchPlans = useCallback(async () => {
     try {
-      // Fetch plans for the current user only
-      const response = await fetch(`/api/sprint-plans?user_email=${encodeURIComponent(userEmail)}`);
+      // Build query parameters
+      let url = `${process.env.REACT_APP_API_URL}/api/sprint-plans`;
+      const params = new URLSearchParams();
+      
+      if (selectedFilter === 'Created by Me') {
+        params.append('filter_type', 'Created by Me');
+        params.append('user_email', userEmail);
+      } else {
+        params.append('workspace', selectedFilter);
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await fetch(url);
       const data = await response.json();
       
       if (data.success) {
@@ -49,7 +83,7 @@ const ExistingPlansPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [userEmail]);
+  }, [userEmail, selectedFilter]);
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -356,7 +390,7 @@ const ExistingPlansPage = () => {
     if (!planToDelete) return;
     
     try {
-      const response = await fetch(`/api/sprint-plans/${planToDelete.id}?user_email=${encodeURIComponent(userEmail)}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/sprint-plans/${planToDelete.id}?user_email=${encodeURIComponent(userEmail)}`, {
         method: 'DELETE',
       });
       
@@ -450,17 +484,37 @@ const ExistingPlansPage = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Filter and Search Bar */}
         <div className="search-container">
+          <div className="filter-wrapper">
+            <label htmlFor="workspaceFilter" className="filter-label">Select Filter:</label>
+            <select
+              id="workspaceFilter"
+              value={selectedFilter}
+              onChange={(e) => {
+                setSelectedFilter(e.target.value);
+                setCurrentPage(1); // Reset to first page when filter changes
+              }}
+              className="workspace-filter"
+            >
+              <option value="Created by Me">Created by Me</option>
+              {workspaces.map((workspace) => (
+                <option key={workspace.id} value={workspace.name}>
+                  {workspace.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
           <div className="search-wrapper">
             <div className="search-input-group">
-                             <input
-                 type="text"
-                 placeholder="Search by Sprint Number (e.g., 1, Sprint 1, Q1234)..."
-                 value={searchTerm}
-                 onChange={handleSearchChange}
-                 className="search-input"
-               />
+              <input
+                type="text"
+                placeholder="Search by Sprint Number (e.g., 1, Sprint 1, Q1234)..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="search-input"
+              />
               {searchTerm && (
                 <button 
                   className="clear-search-btn" 
@@ -471,18 +525,18 @@ const ExistingPlansPage = () => {
                 </button>
               )}
             </div>
-                         <div className="search-info">
-               {searchTerm && (
-                 <span className="search-results">
-                   Found {filteredPlans.length} plan{filteredPlans.length !== 1 ? 's' : ''} for "{searchTerm}"
-                 </span>
-               )}
-               {!searchTerm && (
-                 <span className="search-tips">
-                   💡 Search tips: Try "1", "Sprint 1", "Q1234", or just "1234"
-                 </span>
-               )}
-             </div>
+            <div className="search-info">
+              {searchTerm && (
+                <span className="search-results">
+                  Found {filteredPlans.length} plan{filteredPlans.length !== 1 ? 's' : ''} for "{searchTerm}"
+                </span>
+              )}
+              {!searchTerm && (
+                <span className="search-tips">
+                  💡 Search tips: Try "1", "Sprint 1", "Q1234", or just "1234"
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

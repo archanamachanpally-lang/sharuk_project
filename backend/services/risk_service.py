@@ -98,7 +98,7 @@ class RiskAssessmentService:
                 is_complete=False
             )
     
-    def finish_risk_assessment(self, request: RiskAssessmentFinishRequest, db: Session) -> RiskAssessmentFinishResponse:
+    def finish_risk_assessment(self, request: RiskAssessmentFinishRequest, db: Session, prompt_data: str = None) -> RiskAssessmentFinishResponse:
         """Complete risk assessment and get summary"""
         try:
             # Get risk assessment session
@@ -114,8 +114,8 @@ class RiskAssessmentService:
             session_data["status"] = "completed"
             session_data["completed_at"] = datetime.now()
             
-            # Get Gemini summary using stored prompt data
-            gemini_response = llm_service.generate_risk_assessment(session_data["responses"])
+            # Get Gemini summary using stored prompt data from database
+            gemini_response = llm_service.generate_risk_assessment(session_data["responses"], prompt_data)
             
             # Store summary in session
             session_data["summary"] = gemini_response["summary"]

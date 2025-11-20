@@ -11,6 +11,7 @@ import WeeklyStatusReportPage from './components/WeeklyStatusReportPage';
 import RiskAssessmentPage from './components/RiskAssessmentPage';
 import RiskResultsPage from './components/RiskResultsPage';
 import FeedbackPage from './components/FeedbackPage';
+import ProjectsPage from './components/ProjectsPage';
 import GoogleCallback from './components/GoogleCallback';
 import { AuthProvider } from './contexts/AuthContext';
 import './App.css';
@@ -101,6 +102,7 @@ function App() {
             <Route path="/risk-assessment" element={<RiskAssessmentPage />} />
             <Route path="/risk-results" element={<RiskResultsPage />} />
             <Route path="/feedback" element={<FeedbackPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
